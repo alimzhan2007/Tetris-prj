@@ -3,6 +3,7 @@ from tkinter import messagebox
 from random import choice, randrange
 from copy import deepcopy
 import time
+import pygame
 import pprint
 
 W, H = 13, 25
@@ -10,6 +11,7 @@ TILE = 30
 GAME_RES = W * TILE, H * TILE
 RES = 750, 940
 
+pygame.mixer.init()
 
 def on_closing():
     global app_running
@@ -28,7 +30,6 @@ tk.wm_attributes("-topmost", 1)
 
 sc = Canvas(tk, width=RES[0], height=RES[1], bg="red", highlightthickness=0)
 sc.pack()
-
 
 def get_record():
     try:
@@ -57,27 +58,26 @@ game_sc.create_image(0, 0, anchor=NW, image=img_obj2)
 
 grid = [game_sc.create_rectangle(x * TILE, y * TILE, x * TILE+TILE, y * TILE+TILE) for x in range(W) for y in range(H)]
 
-# figures_pos = [[(0, 0), (0, 1), (0, -1), (1, 0), (-1, 0)],
-#                 [(0, 0), (-1, 1), (-1, 0), (0, -1), (1, -1)],
-#                 [(0, 0), (-1, 0), (-2, 0), (1, 0), (2, 0)],
-#                 [(0, 0), (1, 0), (1, 1), (0, 1), (-1, 0)],
-#                 [(0, 0), (0, 1), (1, 0), (-1, 0), (1, -1)],
-#                 [(0, 0), (1, 0), (-1, 0), (1, 1), (-1, 1)],
-#                 [(0, 0), (1, 0), (1, 1), (0, -1), (0, -2)],
-#                 [(0, 0), (1, 0), (1, 1), (-1, 0), (-1, -1)],
-#                 [(-1, 0), (0, 0), (1, 0), (-2, 0), (-2, -1)],
-#                 [(-1, 0), (0, 0), (1, 0), (-2, 0), (0, -1)],
-#                 [(0, -1), (0, 0), (0, 1), (1, -1), (2, -1)],
-#                 [(0, 0), (0, -1), (1, -1), (-1, -1), (0, 1)]]
+figures_pos = [[(0, 0), (0, 1), (0, -1), (1, 0), (-1, 0)],
+                [(0, 0), (-1, 1), (-1, 0), (0, -1), (1, -1)],
+                [(0, 0), (-1, 0), (-2, 0), (1, 0), (2, 0)],
+                [(0, 0), (1, 0), (1, 1), (0, 1), (-1, 0)],
+                [(0, 0), (0, 1), (1, 0), (-1, 0), (1, -1)],
+                [(0, 0), (1, 0), (-1, 0), (1, 1), (-1, 1)],
+                [(0, 0), (1, 0), (1, 1), (0, -1), (0, -2)],
+                #[(0, 0), (1, 0), (1, 1), (-1, 0), (-1, -1)],
+                #[(-1, 0), (0, 0), (1, 0), (-2, 0), (-2, -1)],
+                #[(-1, 0), (0, 0), (1, 0), (-2, 0), (0, -1)],
+                [(0, -1), (0, 0), (0, 1), (1, -1), (2, -1)],
+                [(0, 0), (0, -1), (1, -1), (-1, -1), (0, 1)]]
 
-figures_pos = [[(0, 0), (-1, 0), (-2, 0), (1, 0), (2, 0)],
-                [(0, 0), (1, 0), (-1, 0), (1, 1), (-1, 1)]]
+# figures_pos = [[(0, 0), (-1, 0), (-2, 0), (1, 0), (2, 0)],
+#                 [(0, 0), (1, 0), (-1, 0), (1, 1), (-1, 1)]]
 
 
 bonus_pos = [(1, 0), (1, 1), (0, 1), (0, 0), (1, -1)]
-bonus = [[x + W // 2, y] for x, y in bonus_pos]
-figures = [[[x + W // 2, y] for x, y in fig_pos] for fig_pos in figures_pos]
-#figure_rect = pygame.Rect(0, 0, TILE - 2, TILE - 2)
+bonus = [[x + W // 2, y + 1] for x, y in bonus_pos]
+figures = [[[x + W // 2, y + 1] for x, y in fig_pos] for fig_pos in figures_pos]
 field = [[0 for i in range(W)] for j in range(H)]
 
 anim_count, anim_speed, anim_limit = 0, 60, 2000
@@ -114,7 +114,7 @@ def check_borders():
 def check_borders_bomb(i, j):
     if i < 0 or i > W - 1:
         return False
-    elif j > H - 1:
+    elif j > H - 1 or j < 0:
         return False
     return True
 
@@ -159,10 +159,10 @@ while app_running:
                 figure[i][1] += 1
                 if not check_borders():
                     if bonus_flag:
-                        for i in range(figure_old[0][0] - 4, figure_old[0][0] + 3):
-                            for j in range(figure_old[0][1] - 4, figure_old[0][1] + 3):
-                                if check_borders_bomb(i, j) and field[i][j]:
-                                    pass
+                        for i in range(figure_old[0][1] - 4, figure_old[0][1] + 4):
+                            for j in range(figure_old[0][0] - 4, figure_old[0][0] + 4):
+                                if check_borders_bomb(j, i) and field[i][j]:
+                                    field[i][j] = 0
                         bonus_flag = False
                     else:
                         for i in range(5):
@@ -197,17 +197,28 @@ while app_running:
                 anim_speed += 3
                 lines += 1
                 bonus_flag = True
-                figure, color = deepcopy(bonus), next_color
+                figure = deepcopy(bonus)
         # compute score
         score += scores[lines]
 
         fig = []
         # draw figure
-        for i in range(5):
-            figure_rect_x = figure[i][0] * TILE
-            figure_rect_y = figure[i][1] * TILE
+        if bonus_flag:
+            for i in range(4):
+                figure_rect_x = figure[i][0] * TILE
+                figure_rect_y = figure[i][1] * TILE
+                fig.append(game_sc.create_rectangle(figure_rect_x, figure_rect_y, figure_rect_x + TILE,
+                                                    figure_rect_y + TILE, fill='black'))
+            figure_rect_x = figure[4][0] * TILE
+            figure_rect_y = figure[4][1] * TILE
             fig.append(game_sc.create_rectangle(figure_rect_x, figure_rect_y, figure_rect_x + TILE,
-                                                figure_rect_y + TILE, fill=rgb_to_hex(color)))
+                                                figure_rect_y + TILE, fill='yellow'))
+        else:
+            for i in range(5):
+                figure_rect_x = figure[i][0] * TILE
+                figure_rect_y = figure[i][1] * TILE
+                fig.append(game_sc.create_rectangle(figure_rect_x, figure_rect_y, figure_rect_x + TILE,
+                                                    figure_rect_y + TILE, fill=rgb_to_hex(color)))
 
         # draw field
         for y, raw in enumerate(field):
@@ -237,7 +248,7 @@ while app_running:
                 score = 0
                 for item in grid:
                     game_sc.itemconfigure(item, fill=rgb_to_hex(get_color()))
-                    time.sleep(0.005)
+                    time.sleep(0.001)
                     tk.update_idletasks()
                     tk.update()
 
